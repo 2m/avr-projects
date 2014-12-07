@@ -9,16 +9,16 @@ dudeflags=-p $(avrType) -c $(programmerType) -P $(programmerDev) -b 10000
 sshdude=ssh root@alarmpi /usr/local/bin/avrdude
 
 name=main
-srcs=main.cpp pmio.cpp
-objs=$(subst .cpp,.o,$(srcs))
-lsts=$(subst .cpp,.lst,$(srcs))
+srcs=main.c pmio.c
+objs=$(subst .c,.o,$(srcs))
+lsts=$(subst .c,.lst,$(srcs))
 
 .PHONY: clean elf hex flash flash-remote readfuse ext-osc-no-divide int-osc-no-divide
 
 clean:
 	rm -f $(objs) $(lsts) $(name).elf $(name).eeprom.hex $(name).fuses.hex $(name).lfuse.hex $(name).hfuse.hex $(name).efuse.hex $(name).flash.hex
 
-%.o: %.cpp
+%.o: %.c
 	avr-gcc $(cflags) -mmcu=$(avrType) -Wa,-ahlmns=$(subst .o,.lst,$@) -c -o $@ $<
 
 elf: $(objs)

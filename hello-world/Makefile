@@ -18,7 +18,7 @@ clean:
 	rm -f $(src).lst $(src).elf $(src).eeprom.hex $(src).fuses.hex $(src).lfuse.hex $(src).hfuse.hex $(src).efuse.hex $(src).flash.hex $(src).o
 
 object:
-	avr-gcc $(cflags) -mmcu=$(avrType) -Wa,-ahlmns=$(src).lst -c -o $(src).o $(src).cpp
+	avr-gcc $(cflags) -mmcu=$(avrType) -Wa,-ahlmns=$(src).lst -c -o $(src).o $(src).c
 
 elf: object
 	avr-gcc $(cflags) -mmcu=$(avrType) -o $(src).elf $(src).o

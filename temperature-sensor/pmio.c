@@ -14,7 +14,8 @@
 // PWM_CHIPS_IN_CYCLE <= 1000 makes all hold_ms > 0 values valid.
 
 void blink(int n) {
-  for(int i = 0; i < n; i++)
+  int i;
+  for(i = 0; i < n; i++)
   {
     PORT |= 1;
     _delay_ms(BLINK_MS);
@@ -50,20 +51,23 @@ void blink_radix(int val, int radix) {
 
 void light(float val, long hold_ms) {
   long cycles = hold_ms * 1000 / (PWM_CHIPS_IN_CYCLE * PWM_CHIP_US);
-  int on_chips = int(val * PWM_CHIPS_IN_CYCLE);
+  int on_chips = (int) (val * PWM_CHIPS_IN_CYCLE);
   if (on_chips < 0) on_chips = 0;
   else if (on_chips > PWM_CHIPS_IN_CYCLE) on_chips = PWM_CHIPS_IN_CYCLE;
   int off_chips = PWM_CHIPS_IN_CYCLE - on_chips;
 
+  long i;
   PORT &= ~1;
-  for(long i = 0; i < cycles; i++)
+  for(i = 0; i < cycles; i++)
   {
     // _delay_us only takes compile-time constants as arguments
-    PORT |= 1;
-    for (int j = 0; j < on_chips; j++)
+    int j;
+    if (on_chips > 0) PORT |= 1;
+    for (j = 0; j < on_chips; j++)
       _delay_us(PWM_CHIP_US);
-    PORT &= ~1;
-    for (int j = 0; j < off_chips; j++)
+    if (off_chips > 0) PORT &= ~1;
+    for (j = 0; j < off_chips; j++)
       _delay_us(PWM_CHIP_US);
   }
+  PORT &= ~1;
 }
