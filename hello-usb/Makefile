@@ -1,62 +1,77 @@
-# AVR cross-compiler toolchain is used here
-CC = avr-gcc
-OBJCOPY = avr-objcopy
-DUDE = avrdude
+programmerDev=/dev/spidev0.0
+programmerType=linuxspi
 
-src=main
-AVR_TYPE=attiny2313
-AVR_FREQ=12000000
-PROGRAMMER_DEV=/dev/spidev0.0
-PROGRAMMER_TYPE=linuxspi
+optimise=-ffunction-sections -fdata-sections -ffreestanding
+cflags=-g -DF_CPU=$(avrFreq) -mmcu=$(avrType) -Wall -Os -Wextra -std=gnu99
+dudeflags=-p $(avrType) -c $(programmerType) -P $(programmerDev)
+dudeMoreFuse=
 
-CFLAGS=-g -DF_CPU=$(AVR_FREQ) -Wall -Os -Werror -Wextra -mmcu=$(AVR_TYPE) -Iusbdrv
-OBJFLAGS=-j .text -j .data -O ihex
-DUDEFLAGS=-p $(AVR_TYPE) -c $(PROGRAMMER_TYPE) -P $(PROGRAMMER_DEV) -v
+ifeq ($(avrType), attiny85)
+	dudeflags+= -b 10000
+else ifeq ($(avrType), attiny2313)
+	dudeMoreFuse=-U lock:r:-:h
+endif
 
-# Object files for the firmware (usbdrv/oddebug.o not strictly needed I think)
-OBJECTS = usbdrv/usbdrv.o usbdrv/oddebug.o usbdrv/usbdrvasm.o main.o
+ifdef dudeHost
+	# remote avrdude
+	sshdude=ssh root@$(dudeHost) /usr/local/bin/avrdude
+	dudeFlash=cat $(name).flash.hex $(name).flash.hex | $(sshdude)
+	dudeFlashFile=-
+	dudeFuse=$(sshdude)
+else
+	# local avrdude
+	dudeFlash=avrdude
+	dudeFlashFile=$(name).flash.hex
+	dudeFuse=avrdude
+endif
+
+ifeq ($(hw), 16mhz-int)
+	avrFreq=16500000
+	fuses=-U lfuse:w:0xe1:m -U hfuse:w:0xdd:m
+else ifeq ($(hw), 8mhz-int)
+	avrFreq=8000000
+	fuses=-U lfuse:w:0xe2:m -U hfuse:w:0xdd:m
+endif
+
+name=main
+srcs=main.c
+objs=$(subst .c,.o,$(srcs))
+lsts=$(subst .c,.lst,$(srcs))
+
+# vusb lib
+cflags+=-I usbdrv
+srcs+= \
+	usbdrv/usbdrv.c \
+	usbdrv/oddebug.c \
+	usbdrv/usbdrvasm.c
 
 # Command-line client
-CMDLINE = usbtest
-
-# By default, build the firmware and command-line client, but do not flash
-all: main.hex
-
-# With this, you can flash the firmware by just typing "make flash" on command-line
-flash: main.hex
-	$(DUDE) $(DUDEFLAGS) -U flash:w:$<
-
-# One-liner to compile the command-line client from usbtest.c
-$(CMDLINE): usbtest.c
+usbtest: usbtest.c
 	gcc -O -Wall usbtest.c -o $@ -lusb
 
-# Housekeeping
+.PHONY: clean object elf hex flash readfuse ext-osc-no-divide int-osc-no-divide
+
 clean:
-	rm -f *.o *.hex *.elf *.lst usbdrv/*.o $(CMDLINE)
+	rm -f $(objs) $(lsts) $(name).elf $(name).eeprom.hex $(name).fuses.hex $(name).lfuse.hex $(name).hfuse.hex $(name).efuse.hex $(name).flash.hex
 
-# From .elf file to .hex
-%.hex: %.elf
-	$(OBJCOPY) $(OBJFLAGS) $< $@
-
-# Main.elf requires additional objects to the firmware, not just main.o
-main.elf: $(OBJECTS)
-	$(CC) $(CFLAGS) $(OBJECTS) -o $@
-
-# Without this dependance, .o files will not be recompiled if you change
-# the config! I spent a few hours debugging because of this...
-$(OBJECTS): usbdrv/usbconfig.h
-
-# From C source to .o object file
 %.o: %.c
-	$(CC) $(CFLAGS) -c $< -o $@
+	avr-gcc $(cflags) $(optimise) -Wa,-ahlmns=$(subst .o,.lst,$@) -c -o $@ $<
 
-# From assembler source to .o object file
 %.o: %.S
-	$(CC) $(CFLAGS) -x assembler-with-cpp -c $< -o $@
+	avr-gcc $(cflags) -x assembler-with-cpp -c $< -o $@
+
+elf: $(objs)
+	avr-gcc $(cflags) $(optimise) -o $(name).elf $(objs)
+	chmod a-x $(name).elf 2>&1
+
+hex: elf
+	avr-objcopy -j .text -j .data -O ihex $(name).elf $(name).flash.hex
+
+flash: hex
+	$(dudeFlash) $(dudeflags) -v -U flash:w:$(dudeFlashFile):i
 
 readfuse:
-	avrdude -p $(AVR_TYPE) -c $(programmerType) -P $(programmerDev) -U lfuse:r:-:h -U hfuse:r:-:h -U efuse:r:-:h -U lock:r:-:h
+	$(dudeFuse) $(dudeflags) -U lfuse:r:-:h -U hfuse:r:-:h -U efuse:r:-:h $(dudeMoreFuse)
 
-# External oscilator and no divition of clock
-ext-osc-no-divide:
-	avrdude -p $(AVR_TYPE) -c $(programmerType) -P $(programmerDev) -U lfuse:w:0xef:m
+writefuse:
+	$(dudeFuse) $(dudeflags) -e $(fuses)

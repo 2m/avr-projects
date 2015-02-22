@@ -2,7 +2,7 @@ programmerDev=/dev/spidev0.0
 programmerType=linuxspi
 
 optimise=-ffunction-sections -fdata-sections -ffreestanding
-cflags=-g -DF_CPU=$(avrFreq) -Wall -Os -Werror -Wextra -std=gnu99
+cflags=-g -DF_CPU=$(avrFreq) -mmcu=$(avrType) -Wall -Os -Werror -Wextra -std=gnu99
 dudeflags=-p $(avrType) -c $(programmerType) -P $(programmerDev)
 dudeMoreFuse=
 
@@ -53,10 +53,10 @@ clean:
 	rm -f $(objs) $(lsts) $(name).elf $(name).eeprom.hex $(name).fuses.hex $(name).lfuse.hex $(name).hfuse.hex $(name).efuse.hex $(name).flash.hex
 
 %.o: %.c
-	avr-gcc $(cflags) $(optimise) -mmcu=$(avrType) -Wa,-ahlmns=$(subst .o,.lst,$@) -c -o $@ $<
+	avr-gcc $(cflags) $(optimise) -Wa,-ahlmns=$(subst .o,.lst,$@) -c -o $@ $<
 
 elf: $(objs)
-	avr-gcc $(cflags) $(optimise) -mmcu=$(avrType) -o $(name).elf $(objs)
+	avr-gcc $(cflags) $(optimise) -o $(name).elf $(objs)
 	chmod a-x $(name).elf 2>&1
 
 hex: elf
